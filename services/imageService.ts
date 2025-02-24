@@ -2,71 +2,100 @@ import { decode } from "base64-arraybuffer";
 import * as FileSystem from "expo-file-system";
 import { supabase } from "../lib/supabase";
 
-export const getUserImageSrc = (imagePath: string | null | undefined) => {
+export const getUserImageSrc = (
+  imagePath: string | null | undefined,
+  bucket: string,
+  folderPath = ""
+) => {
   if (typeof imagePath === "string" && imagePath.startsWith("file://")) {
-    // Local URI, likely from the image picker
-    return { uri: imagePath };
+    return { uri: imagePath }; // Local image preview
   } else if (typeof imagePath === "string" && imagePath) {
-    // Remote URI, likely from Supabase storage
-    return getFileFromBucket(imagePath);
-  } else {
-    // Default placeholder image
-    return require("../assets/images/defaultUser.png");
-  }
-};
-
-export const getFileFromBucket = (filePath: string) => {
-  if (filePath) {
     return {
-      uri: `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/public/uploads/${filePath}`,
+      uri: `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${bucket}/${folderPath}/${imagePath}`,
     };
+  } else {
+    return require("../assets/images/defaultUser.png"); // Default image
   }
-  return null;
 };
 
+export const getFileFromBucket = (
+  bucket: string,
+  folderPath: string,
+  filePath: string
+) => {
+  const fullPath = folderPath ? `${folderPath}/${filePath}` : filePath;
+  return filePath
+    ? { uri: `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${bucket}/${fullPath}` }
+    : null;
+};
 export const uploadFile = async (
-  folderName: string,
+  bucket: string,
   fileUri: string,
-  isImage = true
+  folderPath = ""
 ) => {
   try {
-    let fileName = getFilePath(folderName, isImage);
+    const fileName = getFilePath(folderPath, fileUri);
     const fileBase64 = await FileSystem.readAsStringAsync(fileUri, {
       encoding: FileSystem.EncodingType.Base64,
     });
 
-    let imageData = decode(fileBase64);
+    const imageData = decode(fileBase64);
+    const mimeType = getMimeType(fileUri);
 
     let { data, error } = await supabase.storage
-      .from("uploads")
+      .from(bucket)
       .upload(fileName, imageData, {
         cacheControl: "3600",
-        upsert: false,
-        contentType: isImage ? "image/*" : "video/*",
+        upsert: true, // Allow overwriting existing images
+        contentType: mimeType,
       });
-    if (error) return { success: false, msg: error };
 
-    return { success: true, data: data?.path };
+    if (error) return { success: false, msg: error.message };
+
+    // Return the full Supabase storage path
+    const supabaseFilePath = `${folderPath}/${fileName}`;
+    return { success: true, data: supabaseFilePath };
   } catch (error) {
-    console.log("File upload error: ", error);
+    console.error("File upload error:", error);
     return { success: false, msg: "Could not upload media" };
   }
 };
 
-export const getFilePath = (folderName: string, isImage: boolean) => {
-  return `/${folderName}/${new Date().getTime()}${isImage ? ".png" : ".mp4"}`;
+
+export const getFilePath = (folderPath: string, fileUri: string) => {
+  const ext = fileUri.split(".").pop() || "png"; // Extract file extension
+  const timeStamp = new Date().getTime();
+  return folderPath ? `${folderPath}/${timeStamp}.${ext}` : `${timeStamp}.${ext}`;
 };
 
 export const downloadFile = async (url: string) => {
   try {
-    const { uri } = await FileSystem.downloadAsync(url, getLocalFilePath(url));
+    const localPath = getLocalFilePath(url);
+    if (!localPath) throw new Error("Invalid file path");
+
+    const { uri } = await FileSystem.downloadAsync(url, localPath);
     return uri;
   } catch (error) {
+    console.error("File download error:", error);
     return null;
   }
 };
 
-export const getLocalFilePath = (filePath: string) => {
-  let fileName = filePath.split("/").pop();
+export const getLocalFilePath = (filePath: string | null) => {
+  if (!filePath) return null;
+  const fileName = filePath.split("/").pop() || "default.png";
   return `${FileSystem.documentDirectory}${fileName}`;
+};
+
+export const getMimeType = (fileUri: string) => {
+  const ext = fileUri.split(".").pop()?.toLowerCase();
+  const mimeTypes: Record<string, string> = {
+    png: "image/png",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    gif: "image/gif",
+    mp4: "video/mp4",
+    mov: "video/quicktime",
+  };
+  return mimeTypes[ext!] || "application/octet-stream";
 };

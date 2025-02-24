@@ -1,9 +1,9 @@
 import { View, Text, StatusBar, StyleSheet, Alert } from "react-native";
 import React, { useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Logo } from "@/components/Logo";
-import InputField from "@/components/InputField";
-import { Button } from "@/components/Button";
+import { Logo } from "@/components/UI/Logo";
+import InputField from "@/components/UI/InputField";
+import { Button } from "@/components/UI/Button";
 import { OAuth } from "@/components/OAuth";
 import { Link } from "expo-router";
 import { supabase } from "@/lib/supabase";
@@ -11,17 +11,17 @@ import { supabase } from "@/lib/supabase";
 export default function SignUp() {
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
-    name: "",
+    username: "",
     email: "",
     password: "",
   });
 
   const handleSignUp = async () => {
-    if (!form.name || !form.email || !form.password) {
+    if (!form.username || !form.email || !form.password) {
       Alert.alert("Error", "Please fill out all fields.");
       return;
     }
-    let name = form.name.trim();
+    let username = form.username.trim();
     let email = form.email.trim();
     let password = form.password.trim();
 
@@ -35,7 +35,7 @@ export default function SignUp() {
       password,
       options: {
         data: {
-          name,
+          username,
           email,
         },
       },
@@ -50,6 +50,7 @@ export default function SignUp() {
       );
     }
   };
+  
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle={"light-content"} />
@@ -64,10 +65,10 @@ export default function SignUp() {
         </View>
         {/* Fields */}
         <InputField
-          label="Name"
-          placeholder="John Doe"
-          value={form.name}
-          onChangeText={(value) => setForm({ ...form, name: value })}
+          label="Username"
+          placeholder="JohnDoe"
+          value={form.username}
+          onChangeText={(value) => setForm({ ...form, username: value })}
         />
         <InputField
           label="Email"

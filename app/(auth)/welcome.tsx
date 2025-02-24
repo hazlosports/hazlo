@@ -1,8 +1,8 @@
 import { StyleSheet, StatusBar, View, Pressable, Text } from "react-native";
 import React from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Logo } from "@/components/Logo";
-import { Button } from "@/components/Button";
+import { Logo } from "@/components/UI/Logo";
+import { Button } from "@/components/UI/Button";
 import { router } from "expo-router";
 
 export default function Welcome() {

@@ -8,7 +8,7 @@ type ButtonProps = {
   title?: string;
   IconLeft?: React.ComponentType;
   IconRight?: React.ComponentType;
-  variant?: "blue" | "orange" | "outline" | "destructive";
+  variant?: "hazlo" | "user" | "coach" | "club"  | "service" |  "outline" | "destructive";
   size?: "small" | "medium" | "large" | "xl";
   onPress?: () => void;
   loading?: boolean;
@@ -16,14 +16,22 @@ type ButtonProps = {
 
 const getVariant = (variant: ButtonProps["variant"]) => {
   switch (variant) {
-    case "blue":
+    case "hazlo":
       return ["#0EA8F5", "#692EF8"];
-    case "orange":
-      return ["#FFBD55", "#FF7009"];
+    case "user":
+      return ["#2196F3", "#21CBF3"]; // Modern blue gradient
+    case "coach":
+      return ["#FFBD55", "#FF7009"]; // Modern orange gradient
+    case "club":
+      return ['#7dfaaf', "#06d43e"];  
+    case "service":
+      return ['#FF72DC', '#9C00D4']; // Modern green gradient
     case "outline":
       return ["#0E0E0E", "#0E0E0E"];
     case "destructive":
       return ["#FF0000", "#FF0000"];
+    default:
+      return ["#0EA8F5", "#692EF8"];
   }
 };
 
@@ -62,7 +70,7 @@ export function Button({
   title = "",
   IconLeft,
   IconRight,
-  variant = "blue",
+  variant = "hazlo",
   size = "medium",
   onPress = () => {},
   loading = false,

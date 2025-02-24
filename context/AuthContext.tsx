@@ -1,14 +1,16 @@
+import { Role } from "@/services/userService";
 import { createContext, useContext, useState, ReactNode } from "react";
 
 export interface User {
   id?: string;
+  role?: Role
   name?: string;
   email?: string;
   username?: string;
-  profileimage?: string;
-  bannerimage?: string;
   biography?: string;
   location?: string;
+  avatar?: string;
+  banner?: string;
 }
 
 interface AuthContextType {
@@ -31,10 +33,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const setUserData = (userData: Partial<User>) => {
-    setUser((prevUser) => ({
-      ...prevUser,
-      ...userData,
-    }));
+    setUser((prevUser) => {
+      if (!prevUser) return null; // Prevents setting data when user is null
+      return { ...prevUser, ...userData };
+    });
   };
 
   return (

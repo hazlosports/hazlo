@@ -1,6 +1,6 @@
 import { Image, StyleSheet, Text, View } from "react-native";
 import React from "react";
-import { Button } from "./Button";
+import { Button } from "./UI/Button";
 import { icons } from "@/constants";
 
 export function OAuth() {

@@ -1,7 +1,7 @@
 import { ImageStyle, StyleProp, StyleSheet } from "react-native";
 import React from "react";
 import { Image } from "expo-image";
-import { getUserImageSrc } from "../services/imageService";
+import { getUserImageSrc } from "../../services/imageService";
 
 interface AvatarProps {
   uri: string;
@@ -12,7 +12,7 @@ interface AvatarProps {
 export function Avatar({ uri, size = 32, style }: AvatarProps) {
   return (
     <Image
-      source={getUserImageSrc(uri)}
+      source={getUserImageSrc(uri, "profilePictures", "avatar")}
       transition={100}
       style={[
         styles.avatar,

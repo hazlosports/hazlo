@@ -4,212 +4,174 @@ import {
   StatusBar,
   StyleSheet,
   Alert,
-  Image,
-  ScrollView,
+  TouchableOpacity,
 } from "react-native";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Logo } from "@/components/Logo";
-import InputField from "@/components/InputField";
-import { Button } from "@/components/Button";
-import { SportsPicker } from "@/components/SportsPicker";
-import { Dropdown } from "react-native-element-dropdown";
-import { supabase } from "@/lib/supabase";
+import { Logo } from "@/components/UI/Logo";
+import InputField from "@/components/UI/InputField";
+import { Button } from "@/components/UI/Button";
 import { useAuth } from "@/context/AuthContext";
-import { router } from "expo-router";
+import { updateUser } from "@/services/userService";
+import { useRouter } from "expo-router";
 
-// Define the type for sports data items
-type SportItem = {
-  id: string;
-  name: string;
-  imagestring: string;
-};
-
-async function getData(): Promise<{
-  success: boolean;
-  data?: SportItem[];
-  msg?: string;
-}> {
-  try {
-    const { data, error } = await supabase
-      .from("sports")
-      .select("id, name, imagestring");
-
-    if (error) {
-      return { success: false, msg: error.message };
-    }
-    return { success: true, data: data as SportItem[] };
-  } catch (error: any) {
-    console.log("Warning Error: ", error);
-    return { success: false, msg: error.message };
-  }
-}
-
-const skillLevelsOptions = [
-  { label: "Beginner", value: "beginner" },
-  { label: "Intermediate", value: "intermediate" },
-  { label: "Advanced", value: "advanced" },
-  { label: "Expert", value: "expert" },
-];
-
-export default function OnBoarding() {
-  const { user, setAuth } = useAuth();
-
-  const [data, setData] = useState<SportItem[]>([]);
+export default function userRoleSetup() {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [screen, setScreen] = useState("sportSelection");
-  const [form, setForm] = useState({ username: "" });
-  const [selectedSports, setSelectedSports] = useState<SportItem[]>([]);
-  const [skillLevels, setSkillLevels] = useState<{ [sportId: string]: string }>(
-    {}
-  );
+  const [currentPage, setCurrentPage] = useState(0);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const res = await getData();
-      if (res.success && res.data) setData(res.data);
-    };
-    fetchData();
-  }, []);
+  const [form, setForm] = useState({
+    name: "",
+    biography: "",
+    location: "",
+  });
 
-  const handleSelectSports = useCallback((selectedItems: SportItem[]) => {
-    setSelectedSports(selectedItems);
-  }, []);
+  const router = useRouter();
 
   const handleButtonPress = async () => {
-    setLoading(true);
-    try {
-      if (screen === "sportSelection") {
-        if (!form.username) {
-          Alert.alert("Error", "Please fill out the username field.");
-          return;
-        } else if (selectedSports.length < 1) {
-          Alert.alert("Error", "Choose at least one sport.");
-          return;
-        } else {
-          const { error } = await supabase
-            .from("users")
-            .update({ username: form.username })
-            .eq("id", user?.id);
+    console.log("pressed button");
 
-          if (error) {
-            Alert.alert("Error", "Username is already taken or invalid.");
-            console.log("Error: ", error);
-          } else {
-            setScreen("skillLevelSelection");
-          }
-        }
-      } else if (screen === "skillLevelSelection") {
-        const unselectedLevels = selectedSports.some(
-          (sport) => !skillLevels[sport.id]
-        );
-        if (unselectedLevels) {
-          Alert.alert("Error", "Please select a skill level for each sport.");
+    if (!user?.id) {
+      Alert.alert("Error", "User ID is missing. Please try again.");
+      return;
+    }
+
+    if (currentPage === 0 && !form.name) {
+      Alert.alert("Error", "Please enter your name.");
+      return;
+    }
+
+    if (currentPage === 1 && !form.biography) {
+      Alert.alert("Error", "Please enter a short biography.");
+      return;
+    }
+
+    if (currentPage === 2 && !form.location) {
+      Alert.alert("Error", "Please enter your location.");
+      return;
+    }
+
+    // On the final screen, submit the data
+    if (currentPage === 3) {
+      setLoading(true);
+      try {
+        const response = await updateUser(user.id, form);
+        if (!response.success) {
+          Alert.alert("Error", "Something went wrong while updating your profile.");
+          console.log("Error:", response.msg);
           return;
         }
-        const skillLevelData = selectedSports.map((sport) => ({
-          userid: user?.id,
-          sportid: sport.id,
-          level: skillLevels[sport.id],
-        }));
-
-        const { error } = await supabase
-          .from("usersports")
-          .insert(skillLevelData);
-
-        if (error) {
-          Alert.alert(
-            "Error",
-            "Failed to save your skill levels. Please try again."
-          );
-          console.log("Error: ", error);
-        } else {
-          router.replace("/(root)/(tabs)/home");
-        }
+        router.replace('./rolePicker');
+      } catch (error) {
+        Alert.alert("Error", "An error occurred while updating your profile.");
+        console.log("Unexpected Error:", error);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      Alert.alert("Error", "An error occurred while updating your profile.");
-    } finally {
-      setLoading(false);
+    } else {
+      setCurrentPage(currentPage + 1);
     }
   };
 
-  const handleSkillLevelChange = (sportId: string, level: string) => {
-    setSkillLevels((prev) => ({ ...prev, [sportId]: level }));
+  const handleSkip = () => {
+    if (currentPage < 3 || currentPage === 1 ) {
+      setCurrentPage(currentPage + 1);
+    }
   };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.container}>
-        <StatusBar barStyle={"light-content"} />
-        <Logo containerStyle={{ height: "10%" }} />
-
-        {screen === "sportSelection" ? (
-          <View style={styles.children}>
-            <View style={styles.welcome}>
-              <Text style={styles.welcomeHeader}>Finish your account</Text>
-              <Text style={styles.welcomeSubHeader}>Step 1 of 2</Text>
-            </View>
-            <InputField
-              label="Username"
-              placeholder="johndoe"
-              value={form.username}
-              onChangeText={(value) => setForm({ ...form, username: value })}
-              autoCapitalize="none"
-            />
-            <SportsPicker data={data} onSelectSports={handleSelectSports} />
-            <Button
-              title="Continue"
-              loading={loading}
-              onPress={handleButtonPress}
-            />
-          </View>
-        ) : (
-          <View style={styles.children}>
-            <View style={styles.welcome}>
-              <Text style={styles.welcomeHeader}>Finish your account</Text>
-              <Text style={styles.welcomeSubHeader}>Step 2 of 2</Text>
-            </View>
-            <Text style={styles.title}>Select your skill level</Text>
-            {selectedSports.map((sport) => (
-              <View key={sport.id} style={styles.skillLevelContainer}>
-                <View style={styles.skillLevelText}>
-                  <Image
-                    source={{ uri: sport.imagestring }}
-                    style={styles.image}
-                    resizeMode="contain"
-                  />
-                  <Text style={styles.sportName}>{sport.name}</Text>
-                </View>
-                <Dropdown
-                  style={styles.dropdown}
-                  placeholderStyle={styles.placeholderStyle}
-                  selectedTextStyle={styles.selectedTextStyle}
-                  containerStyle={styles.dropdownContainer}
-                  itemContainerStyle={styles.dropdownItem}
-                  itemTextStyle={styles.dropdownItem}
-                  data={skillLevelsOptions}
-                  labelField="label"
-                  valueField="value"
-                  placeholder="Select level"
-                  value={skillLevels[sport.id]}
-                  onChange={(item) =>
-                    handleSkillLevelChange(sport.id, item.value)
-                  }
-                />
-              </View>
-            ))}
-            <View style={styles.buttonGroup}>
-              <Button
-                title="Back"
-                onPress={() => setScreen("sportSelection")}
-                variant="outline"
-              />
-              <Button title="Submit" onPress={handleButtonPress} />
-            </View>
-          </View>
+      <StatusBar barStyle={"light-content"} />
+      <Logo containerStyle={{ height: "10%" }} />
+      <View style={styles.container}>
+        <View>
+          <Text style={styles.welcomeHeader}>Finish your account</Text>
+          {currentPage != 3 && (
+          <Text style={styles.welcomeSubHeader}>Step {currentPage + 1} of 3</Text>
         )}
-      </ScrollView>
+        </View>
+        <View style={styles.screenContainer}>
+          <View style={styles.promptScreenContainer}>
+            {currentPage === 0 && (
+              <InputField
+                label="Name"
+                placeholder="John Doe"
+                value={form.name}
+                onChangeText={(value) => setForm({ ...form, name: value })}
+                autoCapitalize="words"
+                style={styles.inputField}
+              />
+            )}
+            {currentPage === 1 && (
+              <View style={{ width: "100%" }}>
+                <InputField
+                  label="Biography"
+                  placeholder="Tell us about yourself"
+                  value={form.biography}
+                  onChangeText={(value) => {
+                    if (value.length <= 120) {
+                      setForm({ ...form, biography: value });
+                    }
+                  }}
+                  autoCapitalize="sentences"
+                  multiline={true}
+                  textAlignVertical="top"
+                  style={styles.inputField}
+                />
+                <Text style={styles.subLabel}>Maximum 120 characters</Text>
+              </View>
+            )}
+            {currentPage === 2 && (
+              <InputField
+                label="Location"
+                placeholder="Atlanta"
+                value={form.location}
+                onChangeText={(value) => setForm({ ...form, location: value })}
+                autoCapitalize="words"
+                style={styles.inputField}
+              />
+            )}
+            {currentPage === 3 && (
+
+              <View style={styles.container}>
+              <Text style={styles.reviewHeader}>Review Your Details</Text>
+
+              <View style={styles.reviewContainer}>
+                <View style={styles.reviewItem}>
+                  <Text style={styles.reviewText}>Name:</Text>
+                  <Text style={styles.reviewInfoText}>{form.name}</Text>
+                </View>
+                <View style={styles.reviewItem}>
+                  <Text style={styles.reviewText}>Biography:</Text>
+                  <Text style={styles.reviewInfoText}>{form.biography}</Text>
+                </View>
+                <View style={styles.reviewItem}>
+                  <Text style={styles.reviewText}>Location:</Text>
+                  <Text style={styles.reviewInfoText}>{form.location}</Text>
+                </View>
+              </View>
+              </View>
+            )}
+          </View>
+        </View>
+        <View>
+          <Button
+            title={currentPage === 3 ? "Finish" : "Continue"}
+            loading={loading}
+            onPress={handleButtonPress}
+            size={"xl"}
+          />
+          {currentPage < 3 && (
+            <TouchableOpacity
+              onPress={handleSkip}
+              disabled={currentPage === 3}
+              style={{ opacity: currentPage === 0 || currentPage === 3 ? 0 : 1 }}
+              >
+              <Text style={styles.skip}> Skip </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
     </SafeAreaView>
   );
 }
@@ -220,16 +182,20 @@ const styles = StyleSheet.create({
     backgroundColor: "#0E0E0E",
   },
   container: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    gap: 40,
-    flexGrow: 1,
+    flex: 1,
+    paddingHorizontal: "5%",
   },
-  children: {
-    gap: 20,
+  screenContainer: {
+    flex: 1,
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "10%",
+
   },
-  welcome: {
-    gap: 15,
+  promptScreenContainer: {
+    flex: 1,
+    width: "100%",
+    justifyContent: "space-between",
   },
   welcomeHeader: {
     color: "white",
@@ -237,71 +203,63 @@ const styles = StyleSheet.create({
     fontFamily: "Montserrat-ExtraBold",
   },
   welcomeSubHeader: {
-    color: "white",
+    color: "#B0B0B0",
     fontSize: 16,
     fontFamily: "Montserrat-Regular",
   },
-  skillLevelContainer: {
+  inputField: {
+    backgroundColor: "#1E1E1E",
+    paddingVertical: "3%",
+    paddingHorizontal: "5%",
+    borderRadius: 10,
+    fontSize: 16,
+    color: "white",
+    borderWidth: 1,
+    borderColor: "#3A3A3A",
+  },
+  subLabel: {
+    color: "#B0B0B0",
+    fontSize: 12,
+    fontFamily: "Montserrat-Regular",
+    alignSelf: "flex-end",
+  },
+  skip: {
+    color: "#B0B0B0",
+    fontSize: 14,
+    fontFamily: "Montserrat-Regular",
+    alignSelf: "center",
+    textDecorationLine: "underline",
+    padding: "2%",
+  },
+  reviewContainer: {
+    flex :1,
+    justifyContent : "space-evenly",
+  },
+  reviewHeader: {
+    fontSize: 18,
+    color: "white",
+    fontFamily: "Montserrat-ExtraBold",
+  },
+  reviewItem: {
     flexDirection: "row",
     alignItems: "center",
+    overflow: "visible",
+    flexWrap :"wrap",
     justifyContent: "space-between",
+    backgroundColor: "#1E1E1E",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#3A3A3A",
+    padding : "5%"
   },
-  skillLevelText: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  sportName: {
-    color: "white",
+  reviewText: {
     fontSize: 16,
+    color: "white",
+    fontFamily: "Montserrat-Semibold",
+  },
+  reviewInfoText: {
+    fontSize: 14,
+    color: "white",
     fontFamily: "Montserrat-Regular",
-    textTransform: "capitalize",
-  },
-  dropdown: {
-    width: 150,
-    height: 40,
-    backgroundColor: "#21242A",
-    borderColor: "#D9D9D9",
-    borderWidth: 0.5,
-    borderRadius: 8,
-    paddingHorizontal: 8,
-  },
-  dropdownContainer: {
-    backgroundColor: "#21242A",
-    borderColor: "#D9D9D9",
-    borderWidth: 0.5,
-    borderRadius: 8,
-  },
-  dropdownItem: {
-    backgroundColor: "#21242A",
-    color: "white",
-    fontSize: 14,
-  },
-  selectedTextStyle: {
-    color: "white",
-    fontSize: 14,
-  },
-  placeholderStyle: {
-    color: "#888",
-    fontSize: 14,
-  },
-  image: {
-    width: 30,
-    height: 30,
-    borderRadius: 5,
-    marginRight: 10,
-  },
-  title: {
-    fontSize: 16,
-    fontFamily: "Montserrat-Bold",
-    color: "white",
-    marginTop: 10,
-  },
-  buttonGroup: {
-    marginVertical: 20,
-    marginBottom: 50,
-    display: "flex",
-    flexDirection: "column",
-    gap: 15,
   },
 });

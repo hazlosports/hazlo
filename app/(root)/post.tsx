@@ -7,14 +7,15 @@ import {
   Alert,
   Image,
 } from "react-native";
+
 import React, { useRef, useState } from "react";
 import { ScreenWrapper } from "@/components/ScreenWrapper";
 import { LinearGradient } from "expo-linear-gradient";
 import { StatusBar } from "expo-status-bar";
 import { ImageIcon, Trash, X } from "lucide-react-native";
 import { router } from "expo-router";
-import { Button } from "@/components/Button";
-import RichTextEditor from "@/components/RichTextEditor";
+import { Button } from "@/components/UI/Button";
+import RichTextEditor from "@/components/UI/RichTextEditor";
 import * as ImagePicker from "expo-image-picker";
 import { getFileFromBucket } from "@/services/imageService";
 import { ResizeMode, Video } from "expo-av";
@@ -29,76 +30,102 @@ export default function Post() {
   const [file, setFile] = useState<ImagePicker.ImagePickerAsset | null>();
 
   const onPick = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert(
-        "Permission required",
-        "Permission to access media library is required to select a profile image."
-      );
-      return;
-    }
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Permission required",
+          "Permission to access media library is required to select a profile image."
+        );
+        return;
+      }
 
-    let result = await ImagePicker.launchImageLibraryAsync({
-      allowsEditing: true,
-    });
+      let result = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: true,
+      });
 
-    if (!result.canceled) {
-      setFile(result.assets[0]);
+      if (!result.canceled) {
+        setFile(result.assets[0]);
+      }
+    } catch (error) {
+      console.error("Image Picker Error: ", error);
+      Alert.alert("Error", "Failed to pick an image.");
     }
   };
 
   const getFileUri = (file: ImagePicker.ImagePickerAsset) => {
-    if (!file) return null;
-    if (isLocalFile(file)) {
-      return file.uri;
+    try {
+      if (!file) return null;
+      if (isLocalFile(file)) {
+        return file.uri;
+      }
+      return getFileFromBucket(file.uri)?.uri;
+    } catch (error) {
+      console.error("File URI Error: ", error);
+      return null;
     }
-    return getFileFromBucket(file.uri)?.uri;
   };
 
   const isLocalFile = (file: ImagePicker.ImagePickerAsset) => {
-    if (!file) return null;
-    if (typeof file == "object") return true;
-    return false;
+    try {
+      if (!file) return null;
+      return typeof file === "object";
+    } catch (error) {
+      console.error("File Check Error: ", error);
+      return false;
+    }
   };
 
   const getFileType = (file: ImagePicker.ImagePickerAsset) => {
-    if (!file) return null;
-    if (isLocalFile(file)) {
-      return file.type;
-    }
+    try {
+      if (!file) return null;
+      if (isLocalFile(file)) {
+        return file.type;
+      }
 
-    // check remote file
-    if (file.uri.includes("postImages")) {
-      return "image";
+      if (file.uri.includes("postImages")) {
+        return "image";
+      }
+      return "video";
+    } catch (error) {
+      console.error("File Type Error: ", error);
+      return null;
     }
-    return "video";
   };
 
   const onSubmit = async () => {
-    if (!bodyRef.current || !file || !user?.id) {
-      Alert.alert("Post", "Please choose a media and body");
-      return;
-    }
+    try {
+      if (!bodyRef.current || !file || !user?.id) {
+        Alert.alert("Post", "Please choose a media and body");
+        return;
+      }
 
-    let data = {
-      postData: {
-        file,
-        body: bodyRef.current,
-        userid: user?.id,
-      },
-    };
+      let data = {
+        postData: {
+          file,
+          body: bodyRef.current,
+          userId: user?.id,
+        },
+      };
 
-    setLoading(true);
-    let res = await createOrUpdatePost(data);
-    setLoading(false);
+      console.log(user.id);
 
-    if (res?.success) {
-      setFile(null);
-      bodyRef.current = "";
-      editorRef.current = null;
-      router.replace("/(root)/(tabs)/home");
-    } else {
-      Alert.alert("Post", res?.msg);
+      setLoading(true);
+      let res = await createOrUpdatePost(data);
+      setLoading(false);
+
+      if (res?.success) {
+        setFile(null);
+        bodyRef.current = "";
+        editorRef.current = null;
+        router.replace("/(root)/(tabs)/home");
+      } else {
+        Alert.alert("Post", res?.msg || "Something went wrong.");
+      }
+    } catch (error) {
+      setLoading(false);
+      console.error("Post Submission Error: ", error);
+      Alert.alert("Error", "Failed to create post.");
     }
   };
 
@@ -132,19 +159,27 @@ export default function Post() {
         />
         {file && getFileUri(file) && (
           <View style={styles.file}>
-            {getFileType(file) == "video" ? (
+            {getFileType(file) === "video" ? (
               <Video
                 style={{ flex: 1 }}
                 source={{ uri: getFileUri(file) as string }}
                 useNativeControls
                 isLooping
                 resizeMode={ResizeMode.COVER}
+                onError={(error) => {
+                  console.error("Video Load Error: ", error);
+                  Alert.alert("Error", "Failed to load video.");
+                }}
               />
             ) : (
               <Image
                 source={{ uri: getFileUri(file) as string }}
                 resizeMode="cover"
                 style={{ flex: 1 }}
+                onError={() => {
+                  console.error("Image Load Error");
+                  Alert.alert("Error", "Failed to load image.");
+                }}
               />
             )}
             <TouchableOpacity
@@ -166,7 +201,7 @@ export default function Post() {
           <View style={styles.media}>
             <Text style={styles.mediaText}>Add Media</Text>
             <View style={styles.mediaIcons}>
-              <TouchableOpacity onPress={() => onPick()}>
+              <TouchableOpacity onPress={onPick}>
                 <ImageIcon size={30} color={"#D9D9D9"} />
               </TouchableOpacity>
             </View>

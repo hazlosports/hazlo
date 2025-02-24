@@ -8,12 +8,14 @@ import {
 } from "react-native";
 import React, { useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Logo } from "@/components/Logo";
-import InputField from "@/components/InputField";
-import { Button } from "@/components/Button";
+import { Logo } from "@/components/UI/Logo";
+import InputField from "@/components/UI/InputField";
+import { Button } from "@/components/UI/Button";
 import { Link } from "expo-router";
 import { OAuth } from "@/components/OAuth";
 import { supabase } from "@/lib/supabase";
+import { getUserData } from "@/services/userService"; // Import the getUserData function
+import { router } from "expo-router";
 
 export default function SignIn() {
   const [loading, setLoading] = useState(false);
@@ -27,25 +29,49 @@ export default function SignIn() {
       Alert.alert("Error", "Please fill out all fields.");
       return;
     }
+  
     let email = form.email.trim();
     let password = form.password.trim();
-
     setLoading(true);
-
-    const { error } = await supabase.auth.signInWithPassword({
+  
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
-
+  
     if (error) {
-      Alert.alert(
-        "Sign In Error",
-        error.message || "An unknown error occurred"
-      );
+      Alert.alert("Sign In Error", error.message || "An unknown error occurred");
+      setLoading(false);
+      return;
     }
-
+  
+    const user = data.user;
+    if (!user) {
+      Alert.alert("Error", "Authentication failed. Please try again.");
+      setLoading(false);
+      return;
+    }
+  
+    // Check if the user has a username
+    const userResponse = await getUserData(user.id);
+    if (!userResponse.success) {
+      Alert.alert("Error", "Failed to retrieve user data.");
+      setLoading(false);
+      return;
+    }
+  
+    const userData = userResponse.data;
+    if (!userData?.userRole) {
+      // Redirect to onboarding if the userrole is missing
+      router.push("/(root)/rolePicker");
+    } else {
+      // Redirect to home if the username exists
+      router.dismissTo("/(root)/(tabs)/home");
+    }
+  
     setLoading(false);
   };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle={"light-content"} />

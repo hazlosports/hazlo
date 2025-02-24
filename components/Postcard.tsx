@@ -17,7 +17,7 @@ import {
   Animated,
   Easing,
 } from "react-native";
-import { Avatar } from "./Avatar";
+import { Avatar } from "./UI/Avatar";
 import RenderHtml from "react-native-render-html";
 import { Image } from "expo-image";
 import { downloadFile, getFileFromBucket } from "@/services/imageService";

@@ -16,10 +16,10 @@ import {
   removePostComment,
 } from "@/services/postService";
 import { useAuth } from "@/context/AuthContext";
-import { Loading } from "@/components/Loading";
-import InputField from "@/components/InputField";
+import { Loading } from "@/components/UI/Loading";
+import InputField from "@/components/UI/InputField";
 import { MessageSquareText } from "lucide-react-native";
-import { CommentItem } from "@/components/CommentItem";
+import { CommentItem } from "@/components/UI/CommentItem";
 import { supabase } from "@/lib/supabase";
 import { getUserData } from "@/services/userService";
 
