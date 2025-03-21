@@ -106,10 +106,10 @@ export default function RolePicker() {
   
     switch (selectedIndex) {
       case 0:
-        return router.push("/sportPicker");
+        return router.dismissTo("/sportPicker");
   
       case 1:
-        return router.push("/actionScreen?component=BecomeACoach");
+        return router.dismissTo("/actionScreen?component=BecomeACoach");
         
   
       default:

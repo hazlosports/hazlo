@@ -22,47 +22,23 @@ import RenderHtml from "react-native-render-html";
 import { Image } from "expo-image";
 import { downloadFile, getFileFromBucket } from "@/services/imageService";
 import { ResizeMode, Video } from "expo-av";
-import { createPostLike, removePostLike } from "@/services/postService";
+import { Post, createPostLike, removePostLike } from "@/services/postService";
 import { useEffect, useState } from "react";
 import { stripHtmlTags } from "@/lib/helper";
-
-export interface Post {
-  id: string;
-  file: string;
-  body: string;
-  userid: string;
-  user: {
-    id: string;
-    profileimage: string;
-    username: string;
-  };
-  postLikes: {
-    userId: string;
-    postId: string;
-  }[];
-  comments: { id: string }[];
-}
 
 interface PostcardProps {
   item: Post;
   currentUser: User | null;
   router: Router;
   showMoreIcon?: boolean;
+  onCommentPress?: () => void;  // Callback to handle comment button press
 }
 
 const tagStyles = {
   h1: { color: "white", fontFamily: "Montserrat-Bold" },
   h4: { color: "white", fontFamily: "Montserrat-Medium" },
-  div: {
-    color: "white",
-    fontSize: 16,
-    fontFamily: "Montserrat-Regular",
-  },
-  b: {
-    color: "white",
-    fontSize: 16,
-    fontFamily: "Montserrat-Bold",
-  },
+  div: { color: "white", fontSize: 16, fontFamily: "Montserrat-Regular" },
+  b: { color: "white", fontSize: 16, fontFamily: "Montserrat-Bold" },
   p: { color: "white", fontSize: 16, fontFamily: "Montserrat-Regular" },
   ul: { color: "white", fontSize: 16, fontFamily: "Montserrat-Regular" },
   ol: { color: "white", fontSize: 16, fontFamily: "Montserrat-Regular" },
@@ -73,39 +49,46 @@ export default function Postcard({
   currentUser,
   router,
   showMoreIcon = true,
+  onCommentPress,  // Accept the callback prop
 }: PostcardProps) {
-  const videoUri = getFileFromBucket(item.file);
-  const [loading, setLoading] = useState(false);
-  const [likes, setLikes] = useState<{ userId: string }[]>([]);
-  const liked = likes.filter((like) => like.userId == currentUser?.id)[0]
-    ? true
-    : false;
+  const [folderPath, fileName] = item.file ? item.file.split("/") : ["", ""];
+  const [fileUri, setFileUri] = useState<{ uri: string } | null>(null);
+  const [imageHeight, setImageHeight] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [likeCount, setLikeCount] = useState(item.reactions.likes_count);
+  const [liked, setLiked] = useState(false);
+
+  useEffect(() => {
+    setLiked(false); // Reset state
+    if (currentUser) {
+      // No direct way to check if user liked, so assume false initially
+      // If you later store liked state in the backend, update this logic
+    }
+  }, [item, currentUser]);
 
   const onLike = async () => {
+    if (!currentUser) return;
+
     if (liked) {
-      const updatedLikes = likes.filter(
-        (like) => like.userId !== currentUser?.id
-      );
-      setLikes(updatedLikes);
-      const res = await removePostLike(item.id, currentUser!.id as string);
+      setLikeCount((prev) => Math.max(0, prev - 1));
+      setLiked(false);
+      const res = await removePostLike(item.id, currentUser.id);
       if (!res.success) {
         Alert.alert("Post", "Something went wrong!");
-        setLikes([...likes]);
+        setLikeCount((prev) => prev + 1);
+        setLiked(true);
       }
     } else {
-      const data = { userId: currentUser!.id as string, postId: item.id };
-      setLikes([...likes, data]);
-      const res = await createPostLike(data);
+      setLikeCount((prev) => prev + 1);
+      setLiked(true);
+      const res = await createPostLike({ userId: currentUser.id, postId: item.id });
       if (!res.success) {
         Alert.alert("Post", "Something went wrong!");
-        setLikes(likes);
+        setLikeCount((prev) => prev - 1);
+        setLiked(false);
       }
     }
   };
-
-  useEffect(() => {
-    setLikes(item.postLikes);
-  }, [item.postLikes]);
 
   const onShare = async () => {
     const content: { message: string; url?: string } = {
@@ -114,10 +97,8 @@ export default function Postcard({
 
     if (item.file) {
       setLoading(true);
-      const file = getFileFromBucket(item.file);
-
-      if (file && file.uri) {
-        const url = await downloadFile(file.uri);
+      if (fileUri && fileUri.uri) {
+        const url = await downloadFile(fileUri.uri);
         if (url) {
           content.url = url;
         }
@@ -129,7 +110,6 @@ export default function Postcard({
 
   const spinValue = new Animated.Value(0);
 
-  // Define spinning animation
   useEffect(() => {
     if (loading) {
       Animated.loop(
@@ -151,8 +131,26 @@ export default function Postcard({
   });
 
   const openPostDetails = () => {
-    if (!showMoreIcon) return null;
+    if (!showMoreIcon) return;
     router.push({ pathname: "/postDetails", params: { postId: item.id } });
+  };
+
+  useEffect(() => {
+    const fetchFileUri = async () => {
+      if (!folderPath || !fileName) return;
+      const uri = await getFileFromBucket("uploads", folderPath, fileName);
+      if (uri) {
+        setFileUri(uri);
+        setLoading(false);
+      }
+    };
+
+    fetchFileUri();
+  }, [folderPath, fileName]);
+
+  const onImageLoad = (event: any) => {
+    const { height } = event.nativeEvent.source;
+    setImageHeight(height);
   };
 
   return (
@@ -160,65 +158,65 @@ export default function Postcard({
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.userInfo}>
-          <Avatar size={40} uri={item.user.profileimage} />
-          <Text style={styles.userName}>{item.user.username}</Text>
+          <Avatar size={40} uri={item.user.avatar || ""} style={{ borderWidth: 0.5, borderColor: "#1e1e1e" }} />
+          <Text style={styles.userName}>{item.user.name}</Text>
         </View>
         {showMoreIcon && (
           <TouchableOpacity onPress={openPostDetails}>
-            <Ellipsis size={28} color={"white"} />
+            <Ellipsis size={22} color={"white"} />
           </TouchableOpacity>
         )}
       </View>
-      {/* Post Info */}
-      <View style={styles.content}>
-        <View style={styles.postBody}>
-          <RenderHtml
-            contentWidth={100}
-            source={{ html: item.body }}
-            tagsStyles={tagStyles}
-          />
-        </View>
-        {/* Image */}
-        {item.file.includes("postImages") && (
-          <Image
-            source={getFileFromBucket(item.file)}
-            transition={100}
-            style={styles.postMedia}
-            contentFit="cover"
-          />
-        )}
-        {/* Video */}
-        {item.file.includes("postVideos") && (
-          <Video
-            style={styles.postMedia}
-            source={videoUri ? { uri: videoUri.uri } : undefined}
-            useNativeControls
-            isLooping
-            resizeMode={ResizeMode.COVER}
-          />
-        )}
+
+      {/* Post Content */}
+      <View style={styles.postBody}>
+        <RenderHtml contentWidth={100} source={{ html: item.body }} tagsStyles={tagStyles} />
       </View>
-      {/* Post Actions */}
+
+      {/* Media */}
+      {item.file && (
+        <View style={styles.content}>
+          {folderPath === "postImages" && (
+            <Image
+              source={loading ? require("@/assets/images/defaultBanner.png") : fileUri}
+              transition={100}
+              style={[styles.postMedia, { height: Math.min(imageHeight || 200, 200) }]}
+              contentFit="cover"
+              onLoad={onImageLoad}
+            />
+          )}
+          {folderPath === "postVideos" && fileUri && !loading && (
+            <Video
+              style={styles.postMedia}
+              source={{ uri: fileUri.uri }}
+              useNativeControls
+              isLooping
+              resizeMode={ResizeMode.COVER}
+            />
+          )}
+        </View>
+      )}
+
+      {/* Actions */}
       <View style={styles.footer}>
-        <View style={styles.footerButton}>
-          <TouchableOpacity onPress={onLike}>
-            <ThumbsUp size={24} color={liked ? "#FF3333" : "white"} />
-          </TouchableOpacity>
-          <Text style={styles.footerText}>{likes.length}</Text>
-        </View>
-        <View style={styles.footerButton}>
-          <TouchableOpacity onPress={openPostDetails}>
-            <MessageSquareText size={24} color={"white"} />
-          </TouchableOpacity>
-          <Text style={styles.footerText}>{item.comments.length || 0}</Text>
-        </View>
+        <TouchableOpacity onPress={onLike} style={styles.footerButton}>
+          <ThumbsUp size={26} color={liked ? "#FF3333" : "white"} />
+          <Text style={styles.footerText}>{likeCount}</Text>
+        </TouchableOpacity>
+
+        {/* Comment Button and Count */}
+        <TouchableOpacity onPress={onCommentPress} style={styles.footerButton}>
+          <MessageSquareText size={26} color={"white"} />
+          <Text style={styles.footerText}>{item.reactions.comments_count}</Text>
+        </TouchableOpacity>
+
         {loading ? (
           <Animated.View style={{ transform: [{ rotate: spin }] }}>
-            <Loader2 size={24} color={"white"} />
+            <Loader2 size={26} color={"white"} />
           </Animated.View>
         ) : (
           <TouchableOpacity onPress={onShare}>
-            <Send size={24} color={"white"} />
+            <Send size={26} color={"white"} />
           </TouchableOpacity>
         )}
       </View>
@@ -229,8 +227,10 @@ export default function Postcard({
 const styles = StyleSheet.create({
   container: {
     gap: 10,
-    marginBottom: 15,
-    padding: 5,
+    paddingHorizontal: "5%",
+    paddingVertical: "2%",
+    borderBottomWidth: 0.5,
+    borderColor: "#1e1e1e",
   },
   header: {
     display: "flex",
@@ -251,29 +251,28 @@ const styles = StyleSheet.create({
   content: {
     gap: 10,
   },
-  postBody: {
-    marginLeft: 5,
-  },
+  postBody: {},
   postMedia: {
     width: "100%",
-    height: 220,
-    borderRadius: 8,
+    borderRadius: "2%",
+    borderWidth: 0.5,
+    borderColor: "#1e1e1e",
   },
   footer: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-start",
-    gap: 25,
-    marginLeft: 10,
+    gap: "5%",
   },
   footerButton: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    padding: "2%",
   },
   footerText: {
     color: "white",
     fontFamily: "Montserrat-Medium",
-    fontSize: 14,
+    fontSize: 16,
+    paddingHorizontal: "2%",
   },
 });

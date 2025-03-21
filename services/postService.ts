@@ -2,54 +2,59 @@ import { ImagePickerAsset } from "expo-image-picker";
 import { uploadFile } from "./imageService";
 import { supabase } from "@/lib/supabase";
 
-export interface PostData {
-  postData: {
-    file: ImagePickerAsset | string | undefined;
-    body: string;
-    userId: string;
+// Post interface definition
+export interface Post {
+  id: string;
+  body: string;
+  file?: string; // The file URL (image/video URL)
+  user: {
+    id: string;
+    name: string;
+    avatar?: string | null;
   };
+  reactions: {
+    likes_count: number;
+    comments_count: number;
+  };
+  created_at?: string;
 }
-
 export interface PostLike {
   userId: string;
   postId: string;
 }
 
 export interface PostComment {
+  id: string;
   userId: string;
   postId: string;
   text: string;
 }
 
-export async function createOrUpdatePost({ postData }: PostData) {
+// Create or update a post
+export async function createOrUpdatePost(post: Post) {
   try {
-    if (!postData.userId || !postData.body) {
-      console.warn("Invalid post data: Missing userid or body.");
+    if (!post.user.id || !post.body) {
+      console.warn("Invalid post data: Missing userId or body.");
       return { success: false, msg: "Invalid post data." };
     }
 
-    // Upload Image
-    if (typeof postData.file === "object") {
-      if (!postData.file.uri) {
-        console.warn("Invalid file: Missing URI.");
-        return { success: false, msg: "Invalid file." };
-      }
+    // Upload Image or Video if file is provided
+    if (post.file && post.file.startsWith('file://')) {
+      const isImage = post.file.includes("image");
+      const folderName = isImage ? "postImages" : "postVideos";
 
-      let isImage = postData.file.type === "image";
-      let folderName = isImage ? "postImages" : "postVideos";
-
-      let fileResult = await uploadFile("uploads", postData.file.uri, folderName);
+      const fileResult = await uploadFile("uploads", post.file, folderName);
       if (!fileResult.success) {
         console.error("File upload failed:", fileResult.msg);
         return fileResult;
       }
 
-      postData.file = fileResult.data;
+      // Make sure post.file is assigned a string (either the result or an empty string if undefined)
+      post.file = fileResult.data || ""; // Fallback to empty string if undefined
     }
 
-    console.log(postData);
-
-    const { data, error } = await supabase.from("posts").upsert(postData).select().single();
+    // Insert or update post
+    const { data, error } = await supabase.from("posts").upsert(post).select().single();
 
     if (error) {
       console.error("Post Error:", error);
@@ -63,6 +68,7 @@ export async function createOrUpdatePost({ postData }: PostData) {
   }
 }
 
+// Fetch posts from followed users
 export async function fetchPosts(currentUserId: string, limit: number = 10) {
   try {
     if (!currentUserId) {
@@ -70,6 +76,7 @@ export async function fetchPosts(currentUserId: string, limit: number = 10) {
       return { success: false, msg: "User ID is required." };
     }
 
+    // Get followed users
     const { data: followedUsers, error: followError } = await supabase
       .from("followers")
       .select("followed_id")
@@ -82,15 +89,16 @@ export async function fetchPosts(currentUserId: string, limit: number = 10) {
 
     const followedUserIds = followedUsers?.map((f: any) => f.followed_id) || [];
 
+    if (followedUserIds.length === 0) {
+      console.warn("No followed users found.");
+      return { success: true, data: [] };
+    }
+
+    // Fetch posts from followed users
     const { data, error } = await supabase
       .from("posts")
       .select(
-        `
-        *,
-        user: users(id, username, avatar),
-        postLikes(user_id, post_id),
-        comments(id)
-        `
+        `*, user: users(id, username, avatar), postLikes(user_id, post_id), comments(id)`
       )
       .in("user_id", followedUserIds)
       .order("created_at", { ascending: false })
@@ -113,6 +121,7 @@ export async function fetchPosts(currentUserId: string, limit: number = 10) {
   }
 }
 
+// Create a like for a post
 export async function createPostLike(postLike: PostLike) {
   try {
     if (!postLike.userId || !postLike.postId) {
@@ -134,6 +143,7 @@ export async function createPostLike(postLike: PostLike) {
   }
 }
 
+// Remove a like from a post
 export async function removePostLike(postId: string, userId: string) {
   try {
     if (!postId || !userId) {
@@ -155,6 +165,7 @@ export async function removePostLike(postId: string, userId: string) {
   }
 }
 
+// Fetch post details
 export async function fetchPostDetails(postId: string) {
   try {
     if (!postId) {
@@ -165,12 +176,7 @@ export async function fetchPostDetails(postId: string) {
     const { data, error } = await supabase
       .from("posts")
       .select(
-        `
-        *,
-        user: users(id, username, avatar),
-        postLikes(user_id, post_id),
-        comments(id, text, user_id, created_at, user: users(id, name, username, avatar))
-        `
+        `*, user: users(id, username, avatar), postLikes(user_id, post_id), comments(id, text, user_id, created_at, user: users(id, name, username, avatar))`
       )
       .eq("id", postId)
       .single();
@@ -192,6 +198,7 @@ export async function fetchPostDetails(postId: string) {
   }
 }
 
+// Create a comment for a post
 export async function createPostComment(postComment: PostComment) {
   try {
     if (!postComment.userId || !postComment.postId || !postComment.text) {
@@ -213,6 +220,7 @@ export async function createPostComment(postComment: PostComment) {
   }
 }
 
+// Remove a comment from a post
 export async function removePostComment(commentId: string) {
   try {
     if (!commentId) {

@@ -1,7 +1,7 @@
 import { Image, StyleSheet, Text, TouchableOpacity, View, FlatList, Alert } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useState, useEffect } from "react";
-import { getAllSports, getImageSource } from "@/services/sportService"; // Import your service
+import { getAllSports, getSportImageSource } from "@/services/sportService"; // Import your service
 import { Button } from "@/components/UI/Button";
 import { Dropdown } from "react-native-element-dropdown";
 import { setUserSport } from "@/services/sportService";
@@ -136,7 +136,7 @@ export function SportsPicker () {
         >
           <View style={styles.itemContainer}>
             <Image
-              source={getImageSource(item.imagestring)} // Use the sport image here
+              source={getSportImageSource(item.imagestring)} // Use the sport image here
               style={styles.sportImage}
               resizeMode="contain"
             />
@@ -173,7 +173,7 @@ export function SportsPicker () {
             <View key={sport.id} style={styles.skillLevelContainer}>
               <View style={styles.skillLevelText}>
                 <Image
-                  source={getImageSource(sport.imagestring)}
+                  source={getSportImageSource(sport.imagestring)}
                   resizeMode="contain"
                 />
                 <Text style={styles.sportName}>{sport.name}</Text>

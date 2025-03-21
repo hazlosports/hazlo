@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { StyleSheet, View, Image, Text, Pressable, ActivityIndicator } from "react-native";
-import { UserSport, getImageSource, getUserSportsWithSkillLevels } from "@/services/sportService";
+import { UserSport, getSportImageSource, getUserSportsWithSkillLevels } from "@/services/sportService";
 
 export default function SportsSection({ userId }: { userId: string }) {
 
@@ -49,7 +49,7 @@ export default function SportsSection({ userId }: { userId: string }) {
         {userSports.slice(0, visibleItems).map((item, index) => (
           <View key={index} style={styles.sportItem}>
             <Image
-              source={getImageSource(item.imageString)}
+              source={getSportImageSource(item.imageString)}
               style={styles.sportItemImage}
               resizeMode="contain"
             />

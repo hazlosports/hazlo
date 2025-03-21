@@ -157,7 +157,7 @@ export async function getAllSports() {
 /**
  * Maps image string to local assets.
  */
-export const getImageSource = (imageString: string) => {
+export const getSportImageSource = (imageString: string) => {
   switch (imageString) {
     case "tennis.png":
       return require("@/assets/icons/tennis.png");

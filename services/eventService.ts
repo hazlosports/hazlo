@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabase";
 
-export type Event = {
-  id?: string;
+export type HazloEvent = {
+  id: string;
   host_id: string;
   name: string;
   description: string;
@@ -9,6 +9,7 @@ export type Event = {
   location: string;
   sport_id: number;
   banner?: string;
+  created_at: string;
 };
 
 export type Assistant = {
@@ -21,7 +22,7 @@ export type Assistant = {
 /**
  * Creates or updates an event.
  */
-export const createOrUpdateEvent = async (event: Event) => {
+export const createOrUpdateEvent = async (event: HazloEvent) => {
   try {
     const { data, error } = await supabase
       .from("events")

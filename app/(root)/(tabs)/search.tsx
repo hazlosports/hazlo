@@ -5,8 +5,12 @@ import { Search } from "lucide-react-native";
 import { Avatar } from "@/components/UI/Avatar";
 import { ScreenWrapper } from "@/components/ScreenWrapper";
 import { supabase } from "@/lib/supabase"; // Assuming supabase client is set up
+import { useRouter } from "expo-router";
 
 export default function SearchUsers() {
+
+  const router = useRouter();
+
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [users, setUsers] = useState<any[]>([]); // Replace `any` with the correct user type
   const [loading, setLoading] = useState(false);
@@ -68,8 +72,13 @@ export default function SearchUsers() {
           data={users}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <Pressable style={styles.userContainer} onPress={router.push("profile?componet?userProfile{id}")}>
-              <Avatar uri={item.profileimage} size={40} />
+          <Pressable
+            style={styles.userContainer}
+            onPress={() => {
+              console.log("Navigating to profile with userId:", item.id);
+              router.push(`/profile?component=${item.role}&userId=${item.id}`);
+            }}
+                        >              <Avatar uri={item.profileimage} size={40} />
               <Text style={styles.userName}>{item.username || item.name}</Text>
             </Pressable>
           )}

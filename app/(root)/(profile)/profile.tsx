@@ -7,6 +7,7 @@ import {
   Text,
   View,
   TouchableOpacity,
+  Image,
 } from 'react-native';
 import {
   SafeAreaProvider,
@@ -18,9 +19,9 @@ import { Feather } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/lib/supabase";
-import { getUserData } from "@/services/userService";
+import { User, getUserData } from "@/services/userService";
+import { followUser, unfollowUser, isFollowing } from '@/services/followerService';
 import { getUserImageSrc } from '@/services/imageService';
-import Dashboard from '@/components/UI/Dashboard';
 import { DashboardItem } from '@/components/UI/Dashboard';
 import { UserProfile } from '@/components/UserProfile';
 import { CoachProfile } from '@/components/CoachProfile';
@@ -64,38 +65,68 @@ function App() {
   const scrollY = useRef(new Animated.Value(0)).current;
 
   const { user } = useAuth();
-  const [userData, setUserData] = useState<any>(null);
+  const [userData, setUserData] = useState<User>();
   const [followersCount, setFollowersCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
-  const [visibleItems, setVisibleSportItems] = useState(3); // Start by showing 3 items
- 
+  const [isUserFollowing, setIsUserFollowing] = useState(false); 
+  const [expanded, setExpanded] = useState(false);
+
+  const fetchUserData = async () => {
+    if (!userId) return;
+    const { success, data } = await getUserData(userId);
+    if (success) setUserData(data);
+  };
+  const fetchFollowersData = async () => {
+    if (!userId) return;
+    const { count: followers } = await supabase
+      .from("followers")
+      .select("*", { count: "exact", head: true })
+      .eq("followed_id", userId);
+
+    const { count: following } = await supabase
+      .from("followers")
+      .select("*", { count: "exact", head: true })
+      .eq("follower_id", userId);
+
+    setFollowersCount(followers || 0);
+    setFollowingCount(following || 0);
+  };
+
+  const checkIfFollowing = async () => {
+    if (userId && user?.id) {
+      const result = await isFollowing(user?.id, userId);
+      if (result.success) {
+        setIsUserFollowing(result.isFollowing || false);  // Default to false if isFollowing is undefined
+      } else {
+        setIsUserFollowing(false);  // Handle the case when the call is unsuccessful
+      }
+    }
+  };
+
   useEffect(() => { 
-    
-    const fetchUserData = async () => {
-      if (!user?.id) return;
-      const { success, data } = await getUserData(userId);
-      if (success) setUserData(data);
-    };
-    const fetchFollowersData = async () => {
-      if (!user) return;
-
-      const { count: followers } = await supabase
-        .from("followers")
-        .select("*", { count: "exact", head: true })
-        .eq("followed_id", user.id);
-
-      const { count: following } = await supabase
-        .from("followers")
-        .select("*", { count: "exact", head: true })
-        .eq("follower_id", user.id);
-
-      setFollowersCount(followers || 0);
-      setFollowingCount(following || 0);
-    };
-
+    checkIfFollowing();
     fetchUserData();
     fetchFollowersData();
-  }, [user]);
+  }, []);
+
+  const handleFollowUnfollow = async () => {
+    if (!userId || !user?.id) return;
+
+    try {
+      if (isUserFollowing) {
+        // If the user is already following, unfollow them
+        await unfollowUser(userId, user?.id);
+        setIsUserFollowing(false); // Update state
+      } else {
+        // If the user is not following, follow them
+        await followUser(user?.id, userId);
+        setIsUserFollowing(true); // Update state
+      }
+      fetchFollowersData(); // Update follower count
+    } catch (error) {
+      console.error("Error with follow/unfollow action:", error);
+    }
+  };
   
   const items: DashboardItem[] = [
     { icon: 'book-open', label: 'Lessons' },
@@ -175,7 +206,7 @@ function App() {
           ],
         }}
       >
-        <Text style={[styles.text, styles.username]}>{user?.username}</Text>
+        <Text style={[styles.text, styles.username]}>{userData?.username}</Text>
         <Text style={[styles.text, styles.tweetsCount]}>Followers {followersCount}</Text>
       </Animated.View>
   
@@ -289,45 +320,85 @@ function App() {
                           .join(" ")}
                       </Text>
                       <View style={styles.checkTester}>
-                        <Check size={16} color="orange" style={styles.checkmark} />
+                        <Image
+                          source={require("@/assets/images/Group 967 (2).png")}
+                        />
                       </View>
                     </View>
-                    <Text style={styles.verification}>
-                      {user?.role
-                        ? user.role.replace(/([A-Z])/g, " $1").replace(/^./, (str) => str.toUpperCase()).trim()
-                        : ""}
-                    </Text>                   
+                                       
                   </View>
                   <View style={styles.locationAndBioContainer}>
                     <Text style={styles.location}>{userData?.location}</Text>
-                    <Text style={styles.bio}>{userData?.biography}</Text>
                   </View>
                 </View>
                 <View style={styles.rightProfileSection}>
                   {/* Edit Profile & Notification Buttons */}
                   <View style={styles.profileActionsButtonContainer}>
+                  {user?.id === userId ? (
                     <TouchableOpacity
                       style={styles.editOrFollowButton}
                       onPress={() => router.navigate("/editProfile")}
                     >
                       <Text style={styles.buttonText}>Edit Profile</Text>
                     </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.editOrFollowButton}
+                      onPress={handleFollowUnfollow}
+                    >
+                      <Text style={styles.buttonText}>
+                        {isUserFollowing ? "Unfollow" : "Follow"}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                     <TouchableOpacity
                       style={styles.settingsOrBellButton}
-                      onPress={() => router.navigate("/editProfile")}
+                      onPress={() => router.navigate("/calendar")}
                     >
                       <Bell size={18} color={"white"} />
                     </TouchableOpacity>           
                   </View>
-                </View>    
+                </View> 
               </View>
+              {/*About section*/}
+
+              <View style={styles.bioContainer}>
+                {/* Biography Section */}
+                {expanded && (
+                  <> 
+                  <Text style={styles.bioSubtitle}>About</Text>
+                  </>
+                )}
+                <Text style={styles.bio} numberOfLines={expanded ? undefined : 2}>
+                  {user?.biography}
+                </Text>
+
+                {/* Show extra texts only when expanded */}
+                {expanded && (
+                  <>
+                    <Text style={styles.bioSubtitle}>Experience</Text>
+                    <Text style={styles.bio}>Additional Text 2</Text>
+                  </>
+                )}
+
+                {/* See More / See Less Button */}
+                {user?.biography && (
+                  <TouchableOpacity onPress={() => setExpanded(!expanded)}>
+                    <Text style={styles.seeMore}>
+                      {expanded ? "See Less" : "See More"}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
             </View>
             <View>
           </View>
         </View>
         </View>
+       
         <View style={styles.componentContainer}>
-          {SelectedComponent ? <SelectedComponent userId={user?.id ?? ""} /> : null} 
+          {SelectedComponent ? <SelectedComponent userId={userId ?? ""} /> : null} 
         </View>
       </Animated.ScrollView>
     </View>
@@ -337,11 +408,11 @@ function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor  : "#0f0f0f"
+    backgroundColor  : "#0e0e0e",
   },
   profileContainer : {
     flex: 1,
-    backgroundColor  :  "#0f0f0f"
+    backgroundColor  : "#0e0e0e",
   },
   text: {
     color: 'white',
@@ -423,14 +494,14 @@ const styles = StyleSheet.create({
   rightProfileSection: {
     flex: 0.5,
   },
-
   // User Info
   userInfoContainer: {
     justifyContent: 'flex-start',
   },
   nameAndCheck: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems : "center",
+    justifyContent : "flex-start"
   },
   name: {
     fontSize: 22,
@@ -438,15 +509,8 @@ const styles = StyleSheet.create({
     color: 'white',
   },
   checkTester: {
-    borderWidth: 1,
-    borderRadius: '100%',
-    borderColor: 'white',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkmark: {
-    marginHorizontal: '10%',
-  },
+    paddingHorizontal : "10%" 
+ },
   verification: {
     fontSize: 12,
     color: 'orange',
@@ -488,12 +552,26 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'gray',
   },
+  bioContainer:{
+    paddingVertical :"5%",
+  },
+  bioSubtitle:{
+    fontSize: 16,
+    fontWeight: "semibold",
+    color: 'white',
+  },
   bio: {
     fontSize: 14,
     color: 'white',
   },
+  seeMore:{
+    color: "blue", // Customize the color
+    fontWeight: "semibold",
+    marginTop: 5,
+  },
   componentContainer : {
     flex  :1,
+    backgroundColor :"#1f1f1f"
   }
  
 });

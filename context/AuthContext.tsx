@@ -2,7 +2,7 @@ import { Role } from "@/services/userService";
 import { createContext, useContext, useState, ReactNode } from "react";
 
 export interface User {
-  id?: string;
+  id: string;
   role?: Role
   name?: string;
   email?: string;

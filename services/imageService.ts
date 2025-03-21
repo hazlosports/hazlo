@@ -11,23 +11,33 @@ export const getUserImageSrc = (
     return { uri: imagePath }; // Local image preview
   } else if (typeof imagePath === "string" && imagePath) {
     return {
-      uri: `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${bucket}/${folderPath}/${imagePath}`,
+      uri: `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/public/${bucket}/${folderPath}/${imagePath}`,
     };
   } else {
     return require("../assets/images/defaultUser.png"); // Default image
   }
-};
-
-export const getFileFromBucket = (
+};export const getFileFromBucket = async (
   bucket: string,
   folderPath: string,
   filePath: string
 ) => {
   const fullPath = folderPath ? `${folderPath}/${filePath}` : filePath;
-  return filePath
-    ? { uri: `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/public/${bucket}/${fullPath}` }
-    : null;
+
+  try {
+    // Generate a signed URL for the file
+    const { data, error } = await supabase.storage.from(bucket).createSignedUrl(fullPath, 60); // Expires in 60 sec
+
+    if (error) {
+      throw error;
+    }
+
+    return { uri: data?.signedUrl }; // Return the signed URL
+  } catch (error) {
+    console.error("Error fetching signed URL:", error);
+    return null;
+  }
 };
+
 export const uploadFile = async (
   bucket: string,
   fileUri: string,

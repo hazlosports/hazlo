@@ -3,10 +3,14 @@ import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { X } from "lucide-react-native";
 import CreateEvent from "@/components/CreateEvent";
+import BookLesson from "@/components/BookLesson";
+import CreatePack from "@/components/CreatePack";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 const COMPONENTS: Record<string, { component: React.ComponentType; title: string }> = {
   newEvent: { component: CreateEvent, title: "Create Event" },
+  bookLesson : {component : BookLesson, title : "Book Lesson"},
+  createPack : {component : CreatePack, title : "Create Pack"},
 };
 
 const ActionScreen = () => {
@@ -14,7 +18,7 @@ const ActionScreen = () => {
   const router = useRouter();
   const SelectedComponent = COMPONENTS[component as string]?.component;
   const title = COMPONENTS[component as string]?.title || "Unknown";
-
+ 
   return (
     <SafeAreaProvider style = {{flex : 1}}>
       <View style={styles.header}>
@@ -63,5 +67,6 @@ const styles = StyleSheet.create({
   },
   componentContainer : {
     flex  :.8,
+    backgroundColor : "#0e0e0e"
   }
 });

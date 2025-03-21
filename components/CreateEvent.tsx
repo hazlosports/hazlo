@@ -17,23 +17,25 @@ import * as ImagePicker from "expo-image-picker";
 import { uploadFile } from "@/services/imageService";
 import { Button } from "@/components/UI/Button";
 import { getAllSports } from "@/services/sportService";
-import { Event, createOrUpdateEvent } from "@/services/eventService"; // Import the eventService
+import { HazloEvent, createOrUpdateEvent } from "@/services/eventService"; // Import the eventService
 import { useAuth } from "@/context/AuthContext";
 import { Pencil } from "lucide-react-native";
 import DatePicker from "@/components/UI/DatePicker";  // Import the custom DatePicker component
-
+  
 export default function CreateEvent() {
 
   const { user } = useAuth();
 
-  const [eventData, setEventData] = useState<Event>({
+  const [eventData, setEventData] = useState<HazloEvent>({
+    id: "",
     host_id: user?.id || "",
     name: "",        
     description: "", 
     date: new Date().toISOString(),        
     location: "",    
     sport_id: 0,     
-    banner: "",      
+    banner: "", 
+    created_at : ""     
   });
 
   const [sports, setSports] = useState<{ label: string; value: number }[]>([]); // sport_id should be number
@@ -112,7 +114,8 @@ export default function CreateEvent() {
     }
 
     // Create event with the selected sport and event time
-    const eventDetails: Event = {
+    const eventDetails: HazloEvent = {
+      id: "",
       host_id,
       name,  // Corrected to use `name` instead of `title`
       description,
@@ -120,8 +123,11 @@ export default function CreateEvent() {
       location,
       sport_id: selectedSport?.value ?? 0,  // Default to 0 if no sport is selected
       banner: bannerRes ? String(bannerRes.data) : banner,
+      created_at: ""
     };
 
+    //remove created at and id from the data IMPORTANT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     try {
       const response = await createOrUpdateEvent(eventDetails);
       if (response.success) {
@@ -236,7 +242,7 @@ export default function CreateEvent() {
 
          
 
-          {loading ? <ActivityIndicator size="large" color="#0000ff" /> : <Button title="Create Event" onPress={onSubmit} />}
+          {loading ? <ActivityIndicator size="large" color="#0000ff" /> : <Button title="Create Event" size={"xl"} onPress={onSubmit} />}
         </View>
       </TouchableWithoutFeedback>
     </SafeAreaProvider>

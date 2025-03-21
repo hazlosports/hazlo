@@ -3,13 +3,13 @@ import { supabase } from "@/lib/supabase";
 
 export type User = {
   id: string;
-  role : Role;
+  role: Role;
   name: string;
   username: string;
   location: string;
   biography: string;
-  avatar : string;
-  banner : string;
+  avatar: string;
+  banner: string;
 };
 
 export enum Role {
@@ -17,8 +17,10 @@ export enum Role {
   VERIFIED_COACH = "verifiedCoach",
 }
 
-  
-const USER_CACHE_KEY = "user_data";
+/**
+ * Generates a unique key for storing user data in SecureStore.
+ */
+const getUserCacheKey = (userId: string) => `user_data_${userId}`;
 
 /**
  * Saves data securely in SecureStore.
@@ -42,10 +44,10 @@ export const getUserData = async (userId: string) => {
   try {
     console.log("Fetching user data for:", userId);
 
-    await clearUserCache()
+    const cacheKey = getUserCacheKey(userId);
 
     // Check SecureStore for cached user data
-    const cachedUser = await getFromSecureStore(USER_CACHE_KEY);
+    const cachedUser = await getFromSecureStore(cacheKey);
     if (cachedUser) {
       console.log("Returning cached user data.");
       return { success: true, data: cachedUser };
@@ -64,7 +66,7 @@ export const getUserData = async (userId: string) => {
     }
 
     // Securely cache the data
-    await saveToSecureStore(USER_CACHE_KEY, data);
+    await saveToSecureStore(cacheKey, data);
     console.log("User data securely cached.");
 
     return { success: true, data };
@@ -75,12 +77,13 @@ export const getUserData = async (userId: string) => {
 };
 
 /**
- * Clears the secure cached user data.
+ * Clears the secure cached user data for a specific user.
  */
-export const clearUserCache = async () => {
+export const clearUserCache = async (userId: string) => {
   try {
-    await SecureStore.deleteItemAsync(USER_CACHE_KEY);
-    console.log("User cache securely cleared.");
+    const cacheKey = getUserCacheKey(userId);
+    await SecureStore.deleteItemAsync(cacheKey);
+    console.log(`User cache securely cleared for user: ${userId}`);
   } catch (error) {
     console.error("Error clearing user cache:", error);
   }
@@ -104,7 +107,7 @@ export const updateUser = async (userId: string, data: Partial<User>) => {
     }
 
     // Clear cache after update
-    await clearUserCache();
+    await clearUserCache(userId);
     console.log("Cache cleared after update.");
 
     return { success: true, msg: "User updated successfully." };
@@ -113,4 +116,3 @@ export const updateUser = async (userId: string, data: Partial<User>) => {
     return { success: false, msg: error.message };
   }
 };
-

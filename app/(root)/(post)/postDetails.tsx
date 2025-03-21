@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import React, { useEffect, useRef, useState } from "react";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import Postcard, { Post } from "@/components/Postcard";
+import Postcard from "@/components/Postcard";
 import {
   createPostComment,
   fetchPostDetails,
@@ -27,10 +27,9 @@ export interface PostDetails {
   id: string;
   file: string;
   body: string;
-  userid: string;
   user: {
     id: string;
-    profileimage: string;
+    avatar: string;
     username: string;
   };
   postLikes: {
@@ -226,7 +225,7 @@ export default function PostDetails() {
                   item={comment}
                   key={comment?.id.toString()}
                   canDelete={
-                    user!.id === comment.userId || user!.id === post.userid
+                    user!.id === comment.userId || user!.id === post.user.id
                   }
                   onDelete={onDeleteCommment}
                 />
