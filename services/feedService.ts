@@ -6,11 +6,11 @@ export type FeedItem = {
   type: 'post' | 'event';
   data: Post | HazloEvent;
 };
-
+ 
 // Define the response shape returned by the `rpc` call
 export type GetFeedResponse = FeedItem[];
 
-
+  
 export const getFeed = async (
   userId: string,
   cursor: string | null = null

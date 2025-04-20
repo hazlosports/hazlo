@@ -17,32 +17,47 @@ import * as ImagePicker from "expo-image-picker";
 import { uploadFile } from "@/services/imageService";
 import { Button } from "@/components/UI/Button";
 import { getAllSports } from "@/services/sportService";
-import { HazloEvent, createOrUpdateEvent } from "@/services/eventService"; // Import the eventService
+import { Location, createOrUpdateLocation } from "@/services/locationsService";
+import { HazloEvent, createOrUpdateEvent } from "@/services/eventService";
 import { useAuth } from "@/context/AuthContext";
 import { Pencil } from "lucide-react-native";
-import DatePicker from "@/components/UI/DatePicker";  // Import the custom DatePicker component
-  
-export default function CreateEvent() {
+import DatePicker from "@/components/UI/DatePicker";
+import { useLocalSearchParams } from "expo-router";
 
+export default function CreateEvent() {
   const { user } = useAuth();
+  const params = useLocalSearchParams();
+
+  const latitude = Number(params?.latitude);
+  const longitude = Number(params?.longitude);
+
+  const [locationData, setLocationData] = useState<Partial<Location>>({ // Let Supabase handle ID if needed, or you can generate one
+    name: "",
+    address: "",
+    latitude: latitude,
+    longitude: longitude,
+  });
 
   const [eventData, setEventData] = useState<HazloEvent>({
     id: "",
     host_id: user?.id || "",
-    name: "",        
-    description: "", 
-    date: new Date().toISOString(),        
-    location: "",    
-    sport_id: 0,     
-    banner: "", 
-    created_at : ""     
+    name: "",
+    description: "",
+    date: new Date().toISOString(),
+    location_id: "",
+    sport_id: 0,
+    banner: "",
+    created_at: "",
   });
 
-  const [sports, setSports] = useState<{ label: string; value: number }[]>([]); // sport_id should be number
+  const [sports, setSports] = useState<{ label: string; value: number }[]>([]);
   const [selectedSport, setSelectedSport] = useState<{ label: string; value: number } | null>(null);
 
+  const [venueName, setVenueName] = useState("");
+  const [venueAddress, setVenueAddress] = useState("");
 
   const [loading, setLoading] = useState(true);
+  const [isDatePickerVisible, setDatePickerVisible] = useState(false);
 
   useEffect(() => {
     const fetchSports = async () => {
@@ -65,10 +80,7 @@ export default function CreateEvent() {
   const onPickBannerImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert(
-        "Permission required",
-        "Permission to access media library is required to select a banner image."
-      );
+      Alert.alert("Permission required", "Permission to access media library is required to select a banner image.");
       return;
     }
 
@@ -78,26 +90,22 @@ export default function CreateEvent() {
       quality: 0.7,
     });
 
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      setEventData((prevData) => ({
-        ...prevData,
-        banner: result.assets[0].uri,
-      }));
+    if (!result.canceled && result.assets?.length > 0) {
+      setEventData((prev) => ({ ...prev, banner: result.assets[0].uri }));
     }
   };
 
   const onSubmit = async () => {
-    let { host_id, name, description, date, location, sport_id, banner } = eventData;
-   
-    // Ensure all fields are filled
+    const { host_id, name, description, date, banner } = eventData;
+
     let missingFields: string[] = [];
 
     if (!name) missingFields.push("Event name");
     if (!description) missingFields.push("Description");
     if (!date) missingFields.push("Date");
-    if (!location) missingFields.push("Location");
-    if (sport_id < 0) missingFields.push("Sport");
-    
+    if (!venueName) missingFields.push("Venue name");
+    if (!selectedSport) missingFields.push("Sport");
+
     if (missingFields.length > 0) {
       Alert.alert("Event", `Please fill the following required fields:\n- ${missingFields.join("\n- ")}`);
       return;
@@ -105,7 +113,24 @@ export default function CreateEvent() {
 
     setLoading(true);
 
-    // Handle banner upload if needed
+    // Step 1: Submit location
+    const locationPayload: Partial<Location> = {
+      ...locationData,
+      name: venueName,
+      address: venueAddress || "",
+    };
+
+    const locationResponse = await createOrUpdateLocation(locationPayload);
+
+    if (!locationResponse.success || !locationResponse.data) {
+      Alert.alert("Error", "Failed to save location.");
+      setLoading(false);
+      return;
+    }
+
+    const location_id = locationResponse.data.id;
+
+    // Step 2: Upload banner
     let bannerRes = banner ? await uploadFile("eventBanners", banner, "banner") : null;
     if (banner && !bannerRes?.success) {
       Alert.alert("Error", "Failed to upload banner. Please try again.");
@@ -113,21 +138,17 @@ export default function CreateEvent() {
       return;
     }
 
-    // Create event with the selected sport and event time
-    const eventDetails: HazloEvent = {
-      id: "",
+    // Step 3: Create event
+    const eventDetails: Partial<HazloEvent> = {
       host_id,
-      name,  // Corrected to use `name` instead of `title`
+      name,
       description,
       date,
-      location,
-      sport_id: selectedSport?.value ?? 0,  // Default to 0 if no sport is selected
+      location_id,
+      sport_id: selectedSport?.value ?? 0,
       banner: bannerRes ? String(bannerRes.data) : banner,
-      created_at: ""
     };
 
-    //remove created at and id from the data IMPORTANT!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    //!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     try {
       const response = await createOrUpdateEvent(eventDetails);
       if (response.success) {
@@ -142,32 +163,28 @@ export default function CreateEvent() {
     }
   };
 
-  const dismissKeyboard = () => {
-    Keyboard.dismiss();
-  };
-
-  const [isDatePickerVisible, setDatePickerVisible] = useState(false);
+  const dismissKeyboard = () => Keyboard.dismiss();
 
   const handleDateChange = (date: string) => {
-    // Update the eventData with the selected date
     setEventData({ ...eventData, date: new Date(date).toISOString() });
-    setDatePickerVisible(false); // Hide the date picker after selecting the date
+    setDatePickerVisible(false);
   };
 
-  const toggleDatePicker = () => {
-    setDatePickerVisible((prev) => !prev); // Toggle the visibility of the date picker
-  };
+  const toggleDatePicker = () => setDatePickerVisible((prev) => !prev);
 
-// Helper function to format the date and time for the button display
   const formatDate = (date: string) => {
     const parsedDate = new Date(date);
-    return new Intl.DateTimeFormat("en-US", {
-      month: "long",
-      day: "2-digit",
-      year: "numeric",
-    }).format(parsedDate) + " " + parsedDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return (
+      new Intl.DateTimeFormat("en-US", {
+        month: "long",
+        day: "2-digit",
+        year: "numeric",
+      }).format(parsedDate) +
+      " " +
+      parsedDate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    );
   };
-   
+
   return (
     <SafeAreaProvider>
       <View style={styles.bannerContainer}>
@@ -197,33 +214,34 @@ export default function CreateEvent() {
             value={eventData.description}
             onChangeText={(text) => setEventData({ ...eventData, description: text })}
           />
-
-          <View style={{ padding: 20 }}>
-                {/* Button to show selected date or toggle date picker */}
-                {!isDatePickerVisible ? (
-                  <TouchableOpacity onPress={toggleDatePicker} style={{ padding: 10, backgroundColor: "#007BFF", borderRadius: 5 }}>
-                    <Text style={{ color: "white", fontSize: 16 }}>
-                      {eventData.date ? formatDate(eventData.date) : "Select Date"}
-                    </Text>
-                  </TouchableOpacity>
-                ) : (
-                  // Date Picker visible when toggled
-                  <DatePicker
-                    selectedDate={eventData.date}
-                    onDateChange={handleDateChange}
-                    modifiableYear = {false}
-                  />
-                )}
-              </View>
-
           <TextInput
             style={styles.input}
-            placeholder="Location"
-            value={eventData.location}
-            onChangeText={(text) => setEventData({ ...eventData, location: text })}
+            placeholder="Venue Name"
+            value={venueName}
+            onChangeText={setVenueName}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="Venue Address (Optional)"
+            value={venueAddress}
+            onChangeText={setVenueAddress}
           />
 
-          {/* Sport Picker */}
+          <View style={{ padding: 20 }}>
+            {!isDatePickerVisible ? (
+              <TouchableOpacity
+                onPress={toggleDatePicker}
+                style={{ padding: 10, backgroundColor: "#007BFF", borderRadius: 5 }}
+              >
+                <Text style={{ color: "white", fontSize: 16 }}>
+                  {eventData.date ? formatDate(eventData.date) : "Select Date"}
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <DatePicker selectedDate={eventData.date} onDateChange={handleDateChange} modifiableYear={false} />
+            )}
+          </View>
+
           <Dropdown
             style={styles.dropdown}
             placeholderStyle={styles.placeholderStyle}
@@ -236,13 +254,15 @@ export default function CreateEvent() {
             labelField="label"
             valueField="value"
             value={selectedSport}
-            onChange={(item) => setSelectedSport(item)} // Store the full object instead of just the value
+            onChange={(item) => setSelectedSport(item)}
             placeholder="Select Sport"
           />
 
-         
-
-          {loading ? <ActivityIndicator size="large" color="#0000ff" /> : <Button title="Create Event" size={"xl"} onPress={onSubmit} />}
+          {loading ? (
+            <ActivityIndicator size="large" color="#0000ff" />
+          ) : (
+            <Button title="Create Event" size="xl" onPress={onSubmit} />
+          )}
         </View>
       </TouchableWithoutFeedback>
     </SafeAreaProvider>
@@ -274,32 +294,15 @@ const styles = StyleSheet.create({
     flex: 0.7,
     padding: "5%",
   },
-  fieldContainer: {
-    marginBottom: "4%",
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: "600",  // Slightly stronger font weight for clarity
-    color: "white",
-    marginBottom: "2%",
-  },
   input: {
     color: "white",
     padding: "5%",
     borderRadius: 8,
-    backgroundColor: "#1e1e1e",  // More muted gray for modern look
+    backgroundColor: "#1e1e1e",
     fontSize: 14,
     borderColor: "#3D3D3D",
     borderWidth: 0.5,
-  },
-  dropdownWrapper: {
     marginBottom: "4%",
-  },
-  dropdownTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "white",
-    marginBottom: "2%",
   },
   dropdown: {
     width: "50%",

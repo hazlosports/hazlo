@@ -6,7 +6,7 @@ export type HazloEvent = {
   name: string;
   description: string;
   date: string;
-  location: string;
+  location_id: string;
   sport_id: number;
   banner?: string;
   created_at: string;
@@ -22,7 +22,7 @@ export type Assistant = {
 /**
  * Creates or updates an event.
  */
-export const createOrUpdateEvent = async (event: HazloEvent) => {
+export const createOrUpdateEvent = async (event: Partial<HazloEvent>) => {
   try {
     const { data, error } = await supabase
       .from("events")
@@ -90,12 +90,12 @@ export const getEventsByHost = async (hostId: string) => {
 /**
  * Gets events by location.
  */
-export const getEventsByLocation = async (location: string) => {
+export const getEventsByLocationID = async (location: number) => {
   try {
     const { data, error } = await supabase
       .from("events")
       .select()
-      .eq("location", location);
+      .eq("location_id", location);
 
     if (error) {
       console.error("Error fetching events by location:", error);

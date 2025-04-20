@@ -5,7 +5,7 @@ export default function Layout() {
   return (
     <SafeAreaProvider>
       <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="(drawer)" />
         <Stack.Screen name="(profile)" />
         <Stack.Screen name="onboarding" />
         <Stack.Screen name="rolePicker" />

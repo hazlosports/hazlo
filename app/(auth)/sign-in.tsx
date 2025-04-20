@@ -63,10 +63,10 @@ export default function SignIn() {
     const userData = userResponse.data;
     if (!userData?.userRole) {
       // Redirect to onboarding if the userrole is missing
-      router.dismissTo("/(root)/(tabs)/home");
+      router.dismissTo("/(root)/(drawer)/(tabs)/home");
     } else {
       // Redirect to home if the username exists
-      router.dismissTo("/(root)/(tabs)/home");
+      router.dismissTo("/(root)/(drawer)/(tabs)/home");
     }
   
     setLoading(false);

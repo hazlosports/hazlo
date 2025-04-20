@@ -6,22 +6,25 @@ import { getSportImageSource } from '@/services/sportService';
 
 type EventCardProps = {
   event: HazloEvent;
+  showBanner?: boolean;
 };
 
-const EventCard = ({ event }: EventCardProps) => {
+const EventCard = ({ event, showBanner = true }: EventCardProps) => {
   const router = useRouter();
 
   return (
     <View style={styles.eventCardContainer}>
       <View style={styles.eventCard}>
         {/* Banner Section */}
-        <View style={styles.eventCardBanner}>
-          <Image
-            source={require('@/assets/images/defaultBanner.png')}
-            style={styles.bannerImage} // Make sure the image fits the banner section
-            resizeMode="cover"
-          />
-        </View>
+        {showBanner && (
+          <View style={styles.eventCardBanner}>
+            <Image
+              source={require('@/assets/images/defaultBanner.png')}
+              style={styles.bannerImage}
+              resizeMode="cover"
+            />
+          </View>
+        )}
 
         {/* Content Section */}
         <View style={styles.eventCardInformation}>
@@ -70,18 +73,18 @@ const styles = StyleSheet.create({
     borderColor: "#0c0c0c",
     backgroundColor: "#1a1a1a",
     justifyContent: "space-between",
-    overflow: 'hidden', // Ensures the child elements respect the rounded corners
+    overflow: 'hidden',
   },
   eventCardBanner: {
     aspectRatio: 1.6,
     width: '100%',
-    overflow: 'hidden', // Ensures the image is clipped to the rounded corners
-    borderTopEndRadius: 12, // Apply this if you want the image to be clipped to the rounded corners
+    overflow: 'hidden',
+    borderTopEndRadius: 12,
   },
   bannerImage: {
     width: '100%',
-    height: '100%', // Ensure the image takes the full banner height
-    borderTopEndRadius: 12, // Apply this if you want the image to be clipped to the rounded corners
+    height: '100%',
+    borderTopEndRadius: 12,
   },
   eventCardInformation: {
     padding: "5%",
@@ -89,15 +92,13 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-  // Left Section - Image + Date
   leftSection: {
-    flex: 0.15, // Adjust to fit your design, here it takes 20% of the card width
+    flex: 0.15,
     alignItems: "center",
   },
   sportImage: {
     width: 50,
     height: 50,
-    padding : "20%"
   },
   dateContainer: {
     flexDirection: "row",
@@ -115,10 +116,8 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     textTransform: "uppercase",
   },
-
-  // Content Section
   contentSection: {
-    flex: 0.6, // Adjust this to take more or less space
+    flex: 0.6,
     paddingHorizontal: "5%",
     justifyContent: "flex-start",
   },
@@ -133,12 +132,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginBottom: 12,
   },
-
-  // More Section
   moreSection: {
-    flex: 0.1, // Adjust this to fit the button properly
+    flex: 0.1,
   },
-
   showMoreText: {
     color: "orange",
     fontSize: 10,
